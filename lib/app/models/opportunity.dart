@@ -7,6 +7,7 @@ class Opportunity {
   String status;
   String? leadId; // Lead ID optional
   String accountId; // Account ID
+  String productId; // Product ID
   double estimatedRevenue; // Estimated Revenue
   Timestamp? endDate; // End Date
   Timestamp? createdAt;
@@ -18,6 +19,7 @@ class Opportunity {
     required this.status,
     this.leadId,
     required this.accountId,
+    required this.productId,
     required this.estimatedRevenue,
     this.endDate,
     this.createdAt,
@@ -31,6 +33,7 @@ class Opportunity {
       'status': status,
       'leadId': leadId,
       'accountId': accountId,
+      'productId': productId,
       'estimatedRevenue': estimatedRevenue,
       'endDate': endDate,
       'createdAt': createdAt,
@@ -45,6 +48,7 @@ class Opportunity {
       status: doc['status'],
       leadId: doc['leadId'],
       accountId: doc['accountId'],
+      productId: doc['productId'],
       estimatedRevenue: (doc['estimatedRevenue'] as num).toDouble(), // Convert to double
       endDate: doc['endDate'],
       createdAt: doc['createdAt'],

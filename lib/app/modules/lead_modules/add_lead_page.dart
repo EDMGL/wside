@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:get/get.dart';
 import 'package:wside/app/models/lead.dart';
 import 'package:wside/app/models/account.dart'; // Hesap modelini import edin
+import 'package:wside/app/models/products.dart';
 import 'package:wside/app/models/system_user.dart'; // Kullanıcı modelini import edin
 import 'package:wside/app/services/lead_service.dart'; // Servis sınıfını import edin
 
@@ -22,6 +23,7 @@ class _AddLeadPageState extends State<AddLeadPage> {
   String? _selectedStatus;
   String? _selectedAccountId;
   String? _selectedOwnerId;
+  String? _selectedProductId;
   final LeadService _leadService = LeadService();
 
   List<String> _statusOptions = ['New', 'Contacted', 'Qualified', 'Lost'];
@@ -40,6 +42,13 @@ class _AddLeadPageState extends State<AddLeadPage> {
         .map((snapshot) => snapshot.docs.map((doc) => SystemUser.fromDoc(doc)).toList());
   }
 
+  Stream<List<Product>> _getProductsStream() {
+    return FirebaseFirestore.instance
+        .collection('products')
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) => Product.fromFirestore(doc)).toList());
+  }
+
   Future<void> _saveLead(BuildContext context) async {
     if (_formKey.currentState!.validate()) {
       Lead newLead = Lead(
@@ -51,6 +60,7 @@ class _AddLeadPageState extends State<AddLeadPage> {
         ownerId: _selectedOwnerId!,
         description: _descriptionController.text,
         createdAt: Timestamp.now(),
+        productId: _selectedProductId!,
       );
 
       try {
@@ -59,7 +69,6 @@ class _AddLeadPageState extends State<AddLeadPage> {
         Navigator.of(context).pop();
       } catch (e) {
         Get.snackbar('Failed','Failed to add lead');
-
       }
     }
   }
@@ -196,6 +205,34 @@ class _AddLeadPageState extends State<AddLeadPage> {
                             validator: (value) {
                               if (value == null) {
                                 return 'Please select an owner';
+                              }
+                              return null;
+                            },
+                          );
+                        },
+                      ),
+                      StreamBuilder<List<Product>>(
+                        stream: _getProductsStream(),
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData) {
+                            return CircularProgressIndicator();
+                          }
+                          return DropdownButtonFormField<String>(
+                            decoration: InputDecoration(labelText: 'Product'),
+                            items: snapshot.data!
+                                .map((product) => DropdownMenuItem<String>(
+                                      value: product.id,
+                                      child: Text(product.name),
+                                    ))
+                                .toList(),
+                            onChanged: (value) {
+                              setState(() {
+                                _selectedProductId = value;
+                              });
+                            },
+                            validator: (value) {
+                              if (value == null) {
+                                return 'Please select a product';
                               }
                               return null;
                             },

@@ -6,7 +6,9 @@ import 'package:get/get.dart';
 import 'package:wside/app/models/account.dart';
 import 'package:wside/app/models/lead.dart';
 import 'package:wside/app/models/opportunity.dart';
+import 'package:wside/app/models/products.dart';
 import 'package:wside/app/models/system_user.dart';
+
 import 'package:wside/app/modules/accouts_modules/accounts_detail_page.dart';
 import 'package:wside/app/services/lead_service.dart';
 import 'package:wside/app/services/opportunity_service.dart'; // OpportunityService'i import edin
@@ -32,6 +34,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
   String? _selectedAccountId;
   String? _selectedOwnerId;
   String? _selectedStatus;
+  String? _selectedProductId;
   final LeadService _leadService = LeadService();
   final OpportunityService _opportunityService = OpportunityService(); // OpportunityService'i ekleyin
   bool _isLoading = false;
@@ -52,6 +55,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
     _selectedAccountId = widget.lead.accountId;
     _selectedOwnerId = widget.lead.ownerId;
     _selectedStatus = widget.lead.status;
+    _selectedProductId = widget.lead.productId;
   }
 
   Future<void> _saveLead(BuildContext context) async {
@@ -70,12 +74,12 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
         ownerId: _selectedOwnerId!,
         description: _descriptionController.text,
         createdAt: widget.lead.createdAt,
+        productId: _selectedProductId!,
       );
 
       try {
         await _leadService.updateLead(updatedLead);
         Get.snackbar('Success', 'Lead updated successfully');
-        
 
         if (_selectedStatus == 'Qualified') {
           await _showOpportunityForm(context);
@@ -85,7 +89,7 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
           _isEditing = false;
         });
       } catch (e) {
-         Get.snackbar('Failed', 'Failed to update lead');
+        Get.snackbar('Failed', 'Failed to update lead');
       } finally {
         setState(() {
           _isLoading = false;
@@ -105,11 +109,12 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
         estimatedRevenue: estimatedRevenue,
         endDate: Timestamp.fromDate(DateTime.parse(endDate)),
         createdAt: Timestamp.now(),
+        productId: widget.lead.productId,
       );
 
       try {
         await _opportunityService.addOpportunity(newOpportunity);
-            Get.snackbar('Success', 'Opportunity created successfully', snackPosition: SnackPosition.BOTTOM);
+        Get.snackbar('Success', 'Opportunity created successfully', snackPosition: SnackPosition.BOTTOM);
 
       } catch (e) {
         Get.snackbar('Error', 'Failed to create opportunity: $e', snackPosition: SnackPosition.BOTTOM);
@@ -197,6 +202,13 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
         .collection('users')
         .snapshots()
         .map((snapshot) => snapshot.docs.map((doc) => SystemUser.fromDoc(doc)).toList());
+  }
+
+  Stream<List<Product>> _getProductsStream() {
+    return FirebaseFirestore.instance
+        .collection('products')
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) => Product.fromFirestore(doc)).toList());
   }
 
   @override
@@ -406,6 +418,48 @@ class _LeadDetailPageState extends State<LeadDetailPage> {
                               return Text('Owner: No owner', style: TextStyle(fontSize: 16));
                             }
                             return Text('Owner: ${snapshot.data!['name']}', style: TextStyle(fontSize: 16, color: Colors.blue, decoration: TextDecoration.underline));
+                          },
+                        ),
+                  _isEditing
+                      ? StreamBuilder<List<Product>>(
+                          stream: _getProductsStream(),
+                          builder: (context, snapshot) {
+                            if (!snapshot.hasData) {
+                              return CircularProgressIndicator();
+                            }
+                            return DropdownButtonFormField<String>(
+                              decoration: InputDecoration(labelText: 'Product'),
+                              value: _selectedProductId,
+                              items: snapshot.data!
+                                  .map((product) => DropdownMenuItem<String>(
+                                        value: product.id,
+                                        child: Text(product.name),
+                                      ))
+                                  .toList(),
+                              onChanged: (value) {
+                                setState(() {
+                                  _selectedProductId = value;
+                                });
+                              },
+                              validator: (value) {
+                                if (value == null) {
+                                  return 'Please select a product';
+                                }
+                                return null;
+                              },
+                            );
+                          },
+                        )
+                      : FutureBuilder<DocumentSnapshot>(
+                          future: FirebaseFirestore.instance.collection('products').doc(widget.lead.productId).get(),
+                          builder: (context, snapshot) {
+                            if (snapshot.connectionState == ConnectionState.waiting) {
+                              return CircularProgressIndicator();
+                            }
+                            if (!snapshot.hasData || !snapshot.data!.exists) {
+                              return Text('Product: No product', style: TextStyle(fontSize: 16));
+                            }
+                            return Text('Product: ${snapshot.data!['name']}', style: TextStyle(fontSize: 16, color: Colors.blue, decoration: TextDecoration.underline));
                           },
                         ),
                   SizedBox(height: 20.0),

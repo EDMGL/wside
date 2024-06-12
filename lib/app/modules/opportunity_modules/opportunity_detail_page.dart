@@ -4,12 +4,14 @@ import 'package:get/get.dart';
 import 'package:wside/app/models/opportunity.dart';
 import 'package:wside/app/models/account.dart';
 import 'package:wside/app/models/lead.dart';
+import 'package:wside/app/models/products.dart';
 import 'package:wside/app/models/quote.dart';
-import 'package:wside/app/models/system_user.dart'; // SystemUser modelini import edin
+
+import 'package:wside/app/models/system_user.dart';
 import 'package:wside/app/modules/accouts_modules/accounts_detail_page.dart';
 import 'package:wside/app/modules/lead_modules/lead_detail_page.dart';
 import 'package:wside/app/services/opportunity_service.dart';
-import 'package:wside/app/services/quote_service.dart'; // QuoteService'i import edin
+import 'package:wside/app/services/quote_service.dart';
 
 class OpportunityDetailPage extends StatefulWidget {
   final Opportunity opportunity;
@@ -22,16 +24,17 @@ class OpportunityDetailPage extends StatefulWidget {
 
 class _OpportunityDetailPageState extends State<OpportunityDetailPage> {
   final _formKey = GlobalKey<FormState>();
-  final _quoteFormKey = GlobalKey<FormState>(); // Yeni GlobalKey oluştur
+  final _quoteFormKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   late TextEditingController _descriptionController;
-  late TextEditingController _priceController; // Fiyat alanı
-  late TextEditingController _estimatedRevenueController; // Tahmini kazanç alanı
-  late TextEditingController _endDateController; // Bitiş tarihi alanı
+  late TextEditingController _priceController;
+  late TextEditingController _estimatedRevenueController;
+  late TextEditingController _endDateController;
   String? _selectedStatus;
-  String? _selectedSubmittedBy; // Teklif veren kişi
+  String? _selectedSubmittedBy;
+  String? _selectedProductId;
   final OpportunityService _opportunityService = OpportunityService();
-  final QuoteService _quoteService = QuoteService(); // QuoteService'i ekleyin
+  final QuoteService _quoteService = QuoteService();
   bool _isLoading = false;
   bool _isEditing = false;
 
@@ -42,10 +45,11 @@ class _OpportunityDetailPageState extends State<OpportunityDetailPage> {
     super.initState();
     _nameController = TextEditingController(text: widget.opportunity.name);
     _descriptionController = TextEditingController(text: widget.opportunity.description);
-    _priceController = TextEditingController(); // Yeni fiyat alanı
+    _priceController = TextEditingController();
     _estimatedRevenueController = TextEditingController(text: widget.opportunity.estimatedRevenue.toString());
     _endDateController = TextEditingController(text: widget.opportunity.endDate != null ? widget.opportunity.endDate!.toDate().toString().split(' ')[0] : '');
     _selectedStatus = widget.opportunity.status;
+    _selectedProductId = widget.opportunity.productId;
   }
 
   Future<void> _saveOpportunity() async {
@@ -61,6 +65,7 @@ class _OpportunityDetailPageState extends State<OpportunityDetailPage> {
         status: _selectedStatus!,
         leadId: widget.opportunity.leadId,
         accountId: widget.opportunity.accountId,
+        productId: _selectedProductId!,
         estimatedRevenue: double.parse(_estimatedRevenueController.text),
         endDate: Timestamp.fromDate(DateTime.parse(_endDateController.text)),
         createdAt: widget.opportunity.createdAt,
@@ -88,16 +93,16 @@ class _OpportunityDetailPageState extends State<OpportunityDetailPage> {
   }
 
   Future<void> _proceedToQuote() async {
-    if (_quoteFormKey.currentState!.validate()) { // Dialog formunun anahtarını kullan
+    if (_quoteFormKey.currentState!.validate()) {
       Quote newQuote = Quote(
         name: widget.opportunity.name,
         description: 'Generated from Opportunity: ${widget.opportunity.name}',
         status: 'Draft',
-        price: double.parse(_priceController.text), // Fiyat alanı
+        price: double.parse(_priceController.text),
         opportunityId: widget.opportunity.id!,
         accountId: widget.opportunity.accountId,
         createdAt: Timestamp.now(),
-        submittedBy: _selectedSubmittedBy!, // Teklif veren kişi
+        submittedBy: _selectedSubmittedBy!,
       );
 
       try {
@@ -117,7 +122,7 @@ class _OpportunityDetailPageState extends State<OpportunityDetailPage> {
           child: Padding(
             padding: const EdgeInsets.all(20.0),
             child: Form(
-              key: _quoteFormKey, // Yeni form anahtarını kullan
+              key: _quoteFormKey,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -190,6 +195,13 @@ class _OpportunityDetailPageState extends State<OpportunityDetailPage> {
       return null;
     }
     return await FirebaseFirestore.instance.collection('accounts').doc(widget.opportunity.accountId).get();
+  }
+
+  Stream<List<Product>> _getProductsStream() {
+    return FirebaseFirestore.instance
+        .collection('products')
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) => Product.fromFirestore(doc)).toList());
   }
 
   @override
@@ -324,6 +336,42 @@ class _OpportunityDetailPageState extends State<OpportunityDetailPage> {
                             )
                           : Text('Status: ${widget.opportunity.status}', style: TextStyle(fontSize: 16)),
                     ),
+                  ),
+                  StreamBuilder<List<Product>>(
+                    stream: _getProductsStream(),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) {
+                        return CircularProgressIndicator();
+                      }
+                      return Card(
+                        margin: EdgeInsets.symmetric(vertical: 10),
+                        child: ListTile(
+                          title: _isEditing
+                              ? DropdownButtonFormField<String>(
+                                  decoration: InputDecoration(labelText: 'Product'),
+                                  value: _selectedProductId,
+                                  items: snapshot.data!
+                                      .map((product) => DropdownMenuItem<String>(
+                                            value: product.id,
+                                            child: Text(product.name),
+                                          ))
+                                      .toList(),
+                                  onChanged: (String? value) {
+                                    setState(() {
+                                      _selectedProductId = value;
+                                    });
+                                  },
+                                  validator: (value) {
+                                    if (value == null) {
+                                      return 'Please select a product';
+                                    }
+                                    return null;
+                                  },
+                                )
+                              : Text('Product: ${snapshot.data!.firstWhere((product) => product.id == widget.opportunity.productId).name}', style: TextStyle(fontSize: 16)),
+                        ),
+                      );
+                    },
                   ),
                   SizedBox(height: 20.0),
                   FutureBuilder<DocumentSnapshot?>(

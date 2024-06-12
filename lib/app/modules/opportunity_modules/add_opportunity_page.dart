@@ -4,6 +4,8 @@ import 'package:get/get.dart';
 import 'package:wside/app/models/opportunity.dart';
 import 'package:wside/app/models/account.dart';
 import 'package:wside/app/models/lead.dart';
+import 'package:wside/app/models/products.dart';
+
 import 'package:wside/app/services/opportunity_service.dart';
 
 class AddOpportunityPage extends StatefulWidget {
@@ -23,6 +25,7 @@ class _AddOpportunityPageState extends State<AddOpportunityPage> {
   final TextEditingController _endDateController = TextEditingController();
   String? _selectedStatus;
   String? _selectedAccountId;
+  String? _selectedProductId;
   final OpportunityService _opportunityService = OpportunityService();
 
   List<String> _statusOptions = ['New', 'In Progress', 'Won', 'Lost'];
@@ -43,6 +46,13 @@ class _AddOpportunityPageState extends State<AddOpportunityPage> {
         .map((snapshot) => snapshot.docs.map((doc) => Account.fromMap(doc)).toList());
   }
 
+  Stream<List<Product>> _getProductsStream() {
+    return FirebaseFirestore.instance
+        .collection('products')
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) => Product.fromFirestore(doc)).toList());
+  }
+
   Future<void> _saveOpportunity(BuildContext context) async {
     if (_formKey.currentState!.validate()) {
       Opportunity newOpportunity = Opportunity(
@@ -51,6 +61,7 @@ class _AddOpportunityPageState extends State<AddOpportunityPage> {
         description: _descriptionController.text,
         status: _selectedStatus!,
         leadId: widget.lead?.id ?? '',
+        productId: _selectedProductId!,
         estimatedRevenue: double.parse(_estimatedRevenueController.text),
         endDate: Timestamp.fromDate(DateTime.parse(_endDateController.text)),
         createdAt: Timestamp.now(),
@@ -62,7 +73,6 @@ class _AddOpportunityPageState extends State<AddOpportunityPage> {
         Navigator.of(context).pop();
       } catch (e) {
         Get.snackbar('Error','Failed to add opportunity');
-    
       }
     }
   }
@@ -178,6 +188,35 @@ class _AddOpportunityPageState extends State<AddOpportunityPage> {
                         );
                       },
                     ),
+                  StreamBuilder<List<Product>>(
+                    stream: _getProductsStream(),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) {
+                        return CircularProgressIndicator();
+                      }
+                      return DropdownButtonFormField<String>(
+                        decoration: InputDecoration(labelText: 'Product'),
+                        value: _selectedProductId,
+                        items: snapshot.data!
+                            .map((product) => DropdownMenuItem<String>(
+                                  value: product.id,
+                                  child: Text(product.name),
+                                ))
+                            .toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedProductId = value;
+                          });
+                        },
+                        validator: (value) {
+                          if (value == null) {
+                            return 'Please select a product';
+                          }
+                          return null;
+                        },
+                      );
+                    },
+                  ),
                   SizedBox(height: 20.0),
                   ElevatedButton(
                     onPressed: () => _saveOpportunity(context),

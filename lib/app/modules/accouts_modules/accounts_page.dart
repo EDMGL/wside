@@ -1,5 +1,3 @@
-// ignore_for_file: no_leading_underscores_for_local_identifiers, prefer_const_constructors, use_build_context_synchronously
-
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:get/get.dart';
@@ -8,8 +6,16 @@ import 'package:wside/app/modules/accouts_modules/accounts_detail_page.dart';
 import 'package:wside/app/modules/accouts_modules/add_accounts_page.dart';
 import 'package:wside/app/services/account_service.dart'; // AccountService'i import edin
 
-class AccountsPage extends StatelessWidget {
+class AccountsPage extends StatefulWidget {
   const AccountsPage({super.key});
+
+  @override
+  _AccountsPageState createState() => _AccountsPageState();
+}
+
+class _AccountsPageState extends State<AccountsPage> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   Stream<List<Account>> _getAccountsStream() {
     return FirebaseFirestore.instance
@@ -18,21 +24,42 @@ class AccountsPage extends StatelessWidget {
         .map((snapshot) => snapshot.docs.map((doc) => Account.fromMap(doc)).toList());
   }
 
+  Stream<List<Account>> _getSearchResultsStream(String query) {
+    return FirebaseFirestore.instance
+        .collection('accounts')
+        .where('name', isGreaterThanOrEqualTo: query)
+        .where('name', isLessThanOrEqualTo: query + '\uf8ff')
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) => Account.fromMap(doc)).toList());
+  }
+
   Future<void> _deleteAccount(BuildContext context, String accountId) async {
     final AccountService _accountService = AccountService();
     try {
       await _accountService.deleteAccount(accountId);
-         Get.snackbar('Success','Account deleted successfully');
+      Get.snackbar('Success', 'Account deleted successfully');
     } catch (e) {
-               Get.snackbar('Failed','Failed to delete account');
-
+      Get.snackbar('Failed', 'Failed to delete account');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Accounts')),
+      appBar: AppBar(
+        title: TextField(
+          controller: _searchController,
+          decoration: InputDecoration(
+            hintText: 'Search by name...',
+            border: InputBorder.none,
+          ),
+          onChanged: (value) {
+            setState(() {
+              _searchQuery = value;
+            });
+          },
+        ),
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           showDialog(
@@ -50,7 +77,7 @@ class AccountsPage extends StatelessWidget {
         child: Icon(Icons.add),
       ),
       body: StreamBuilder<List<Account>>(
-        stream: _getAccountsStream(),
+        stream: _searchQuery.isEmpty ? _getAccountsStream() : _getSearchResultsStream(_searchQuery),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Center(child: CircularProgressIndicator());
@@ -67,13 +94,13 @@ class AccountsPage extends StatelessWidget {
               Account account = snapshot.data![index];
               return Card(
                 child: ListTile(
-                  title: Text(account.name,style: TextStyle(fontWeight: FontWeight.bold),),
+                  title: Text(account.name, style: TextStyle(fontWeight: FontWeight.bold)),
                   subtitle: Text(account.email),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        icon: Icon(Icons.delete,color: Colors.red,),
+                        icon: Icon(Icons.delete, color: Colors.red),
                         onPressed: () => _deleteAccount(context, account.id!),
                       ),
                     ],

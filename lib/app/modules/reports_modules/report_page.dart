@@ -1,9 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:charts_flutter/flutter.dart' as charts;
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:get/get.dart';
+import 'package:wside/app/models/system_user.dart';
 
 class ReportPage extends StatelessWidget {
   const ReportPage({Key? key}) : super(key: key);
+
+  Future<bool> _isAuthorizedUser() async {
+    User? currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) return false;
+
+    DocumentSnapshot userDoc = await FirebaseFirestore.instance.collection('users').doc(currentUser.uid).get();
+    if (!userDoc.exists) return false;
+
+    SystemUser user = SystemUser.fromDoc(userDoc);
+    return user.roleType == 'Admin';
+  }
 
   Future<Map<String, dynamic>> _getData() async {
     // Kullanıcı verilerini al
@@ -154,7 +168,6 @@ class ReportPage extends StatelessWidget {
       'totalOpportunities': leadSnapshot.size, // Örnek olarak aynı değer
       'totalQuotes': salesCounts.length,
       'totalOrders': orderSnapshot.size,
-      // ignore: avoid_types_as_parameter_names
       'totalRevenue': salesCounts.values.fold(0, (sum, element) => sum + element.toInt()),
     };
   }
@@ -215,95 +228,114 @@ class ReportPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text('Reports')),
-      body: FutureBuilder<Map<String, dynamic>>(
-        future: _getData(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          }
-          var data = snapshot.data!;
-          var seriesList = data['seriesList'] as List<charts.Series<ChartData, String>>;
+    return FutureBuilder<bool>(
+      future: _isAuthorizedUser(),
+      builder: (context, authSnapshot) {
+        if (authSnapshot.connectionState == ConnectionState.waiting) {
+          return Scaffold(
+            appBar: AppBar(title: Text('Reports')),
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
 
-          return Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        if (authSnapshot.hasError || !authSnapshot.hasData || !authSnapshot.data!) {
+          return Scaffold(
+            appBar: AppBar(title: Text('Reports')),
+            body: Center(child: Text('You are not authorized to view this page.')),
+          );
+        }
+
+        return Scaffold(
+          appBar: AppBar(title: Text('Reports')),
+          body: FutureBuilder<Map<String, dynamic>>(
+            future: _getData(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return Center(child: CircularProgressIndicator());
+              }
+              if (snapshot.hasError) {
+                return Center(child: Text('Error: ${snapshot.error}'));
+              }
+              var data = snapshot.data!;
+              var seriesList = data['seriesList'] as List<charts.Series<ChartData, String>>;
+
+              return Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
                   children: [
-                    _buildMetricCard('Total Leads', data['totalLeads']),
-                    _buildMetricCard('Total Accounts', data['totalAccounts']),
-                    _buildMetricCard('Total Contacts', data['totalContacts']),
-                    _buildMetricCard('Total Opportunities', data['totalOpportunities']),
-                    _buildMetricCard('Total Quotes', data['totalQuotes']),
-                    _buildMetricCard('Total Orders', data['totalOrders']),
-                    _buildMetricCardDouble('Total Revenue', data['totalRevenue']),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        _buildMetricCard('Total Leads', data['totalLeads']),
+                        _buildMetricCard('Total Accounts', data['totalAccounts']),
+                        _buildMetricCard('Total Contacts', data['totalContacts']),
+                        _buildMetricCard('Total Opportunities', data['totalOpportunities']),
+                        _buildMetricCard('Total Quotes', data['totalQuotes']),
+                        _buildMetricCard('Total Orders', data['totalOrders']),
+                        _buildMetricCardDouble('Total Revenue', data['totalRevenue']),
+                      ],
+                    ),
+                    SizedBox(height: 20),
+                    Text('Top Leads by Employee', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    Expanded(
+                      child: charts.BarChart(
+                        seriesList.where((series) => series.id == 'Leads').toList(),
+                        animate: true,
+                        vertical: false,
+                      ),
+                    ),
+                    SizedBox(height: 16.0),
+                    Text('Top Activities by Employee', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    Expanded(
+                      child: charts.BarChart(
+                        seriesList.where((series) => series.id == 'Activities').toList(),
+                        animate: true,
+                        vertical: false,
+                      ),
+                    ),
+                    SizedBox(height: 16.0),
+                    Text('Top Sales by Employee', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    Expanded(
+                      child: charts.BarChart(
+                        seriesList.where((series) => series.id == 'Sales').toList(),
+                        animate: true,
+                        vertical: false,
+                      ),
+                    ),
+                    SizedBox(height: 16.0),
+                    Text('Top Orders by Employee', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    Expanded(
+                      child: charts.BarChart(
+                        seriesList.where((series) => series.id == 'Orders').toList(),
+                        animate: true,
+                        vertical: false,
+                      ),
+                    ),
+                    SizedBox(height: 16.0),
+                    Text('Top Revenue by Account', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    Expanded(
+                      child: charts.BarChart(
+                        seriesList.where((series) => series.id == 'AccountRevenue').toList(),
+                        animate: true,
+                        vertical: false,
+                      ),
+                    ),
+                    SizedBox(height: 16.0),
+                    Text('Top Orders by Account', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    Expanded(
+                      child: charts.BarChart(
+                        seriesList.where((series) => series.id == 'AccountOrders').toList(),
+                        animate: true,
+                        vertical: false,
+                      ),
+                    ),
                   ],
                 ),
-                SizedBox(height: 20),
-                Text('Top Leads by Employee', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                Expanded(
-                  child: charts.BarChart(
-                    seriesList.where((series) => series.id == 'Leads').toList(),
-                    animate: true,
-                    vertical: false,
-                  ),
-                ),
-                SizedBox(height: 16.0),
-                Text('Top Activities by Employee', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                Expanded(
-                  child: charts.BarChart(
-                    seriesList.where((series) => series.id == 'Activities').toList(),
-                    animate: true,
-                    vertical: false,
-                  ),
-                ),
-                SizedBox(height: 16.0),
-                Text('Top Sales by Employee', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                Expanded(
-                  child: charts.BarChart(
-                    seriesList.where((series) => series.id == 'Sales').toList(),
-                    animate: true,
-                    vertical: false,
-                  ),
-                ),
-                SizedBox(height: 16.0),
-                Text('Top Orders by Employee', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                Expanded(
-                  child: charts.BarChart(
-                    seriesList.where((series) => series.id == 'Orders').toList(),
-                    animate: true,
-                    vertical: false,
-                  ),
-                ),
-                SizedBox(height: 16.0),
-                Text('Top Revenue by Account', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                Expanded(
-                  child: charts.BarChart(
-                    seriesList.where((series) => series.id == 'AccountRevenue').toList(),
-                    animate: true,
-                    vertical: false,
-                  ),
-                ),
-                SizedBox(height: 16.0),
-                Text('Top Orders by Account', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                Expanded(
-                  child: charts.BarChart(
-                    seriesList.where((series) => series.id == 'AccountOrders').toList(),
-                    animate: true,
-                    vertical: false,
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 }

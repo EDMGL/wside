@@ -25,12 +25,7 @@ class AdminHomePage extends StatelessWidget {
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.co_present_sharp, color: Colors.white),
-            onPressed: () {
-              Get.to( ProfilePage());
-            },
-          ),
+         
           IconButton(
             icon: const Icon(Icons.group_add, color: Colors.white),
             onPressed: () {
@@ -103,6 +98,12 @@ class AdminHomePage extends StatelessWidget {
                         title: 'Reports',
                         icon: Icons.dashboard,
                       ),
+                      MenuItem(
+                        controller: controller,
+                        title: 'Products',
+                        icon: Icons.all_out_outlined,
+                      ),
+                      MenuItem(controller: controller, icon: Icons.celebration, title: 'Campaigns')
                     ],
                   ),
                 ),
@@ -123,7 +124,7 @@ class AdminHomePage extends StatelessWidget {
                   child: ListView(
                     scrollDirection: Axis.horizontal,
                     children: [
-                      MenuItem(
+                       MenuItem(
                         controller: controller,
                         title: 'Accounts',
                         icon: Icons.business,
@@ -162,6 +163,26 @@ class AdminHomePage extends StatelessWidget {
                         controller: controller,
                         title: 'Actions',
                         icon: Icons.pending_actions_rounded,
+                      ),
+                      MenuItem(
+                        controller: controller,
+                        title: 'Activities',
+                        icon: Icons.local_activity,
+                      ),
+                       MenuItem(
+                        controller: controller,
+                        title: 'Reports',
+                        icon: Icons.dashboard,
+                      ),
+                      MenuItem(
+                        controller: controller,
+                        title: 'Products',
+                        icon: Icons.all_out_outlined,
+                      ),
+                       MenuItem(
+                        controller: controller,
+                        title: 'Campaigns',
+                        icon: Icons.celebration,
                       ),
                     ],
                   ),

@@ -1,11 +1,11 @@
-// ignore_for_file: prefer_final_fields, prefer_const_constructors_in_immutables, library_private_types_in_public_api, library_prefixes, prefer_const_constructors, use_build_context_synchronously
-
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:get/get.dart';
 import 'package:wside/app/models/order.dart' as myOrder; // myOrder prefix'i ekleyin
 import 'package:wside/app/models/account.dart';
+import 'package:wside/app/models/products.dart';
 import 'package:wside/app/models/system_user.dart';
+import 'package:wside/app/models/opportunity.dart'; // Opportunity modelini import edin
 import 'package:wside/app/modules/accouts_modules/accounts_detail_page.dart';
 import 'package:wside/app/services/order_service.dart'; // OrderService'i import edin
 
@@ -84,6 +84,23 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
     return FirebaseFirestore.instance.collection('users').snapshots().map(
       (snapshot) => snapshot.docs.map((doc) => SystemUser.fromDoc(doc)).toList(),
     );
+  }
+
+  Future<Product?> _getProductFromOpportunity(String quoteId) async {
+    DocumentSnapshot quoteDoc = await FirebaseFirestore.instance.collection('quotes').doc(quoteId).get();
+    if (quoteDoc.exists) {
+      DocumentSnapshot opportunityDoc = await FirebaseFirestore.instance.collection('opportunities').doc(quoteDoc['opportunityId']).get();
+      if (opportunityDoc.exists) {
+        Opportunity opportunity = Opportunity.fromMap(opportunityDoc);
+        if (opportunity.productId != null && opportunity.productId!.isNotEmpty) {
+          DocumentSnapshot productDoc = await FirebaseFirestore.instance.collection('products').doc(opportunity.productId).get();
+          if (productDoc.exists) {
+            return Product.fromFirestore(productDoc);
+          }
+        }
+      }
+    }
+    return null;
   }
 
   @override
@@ -272,6 +289,23 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
                           'Account: ${account.name}',
                           style: TextStyle(fontSize: 16, color: Colors.blue, decoration: TextDecoration.underline),
                         ),
+                      );
+                    },
+                  ),
+                  SizedBox(height: 20.0),
+                  FutureBuilder<Product?>(
+                    future: _getProductFromOpportunity(widget.order.quoteId),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return CircularProgressIndicator();
+                      }
+                      if (!snapshot.hasData) {
+                        return Text('No associated product found.', style: TextStyle(fontSize: 16));
+                      }
+                      Product? product = snapshot.data;
+                      return Text(
+                        'Product: ${product?.name ?? 'N/A'}',
+                        style: TextStyle(fontSize: 16, color: Colors.blue, decoration: TextDecoration.underline),
                       );
                     },
                   ),

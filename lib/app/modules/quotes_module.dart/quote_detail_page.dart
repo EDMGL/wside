@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:get/get.dart';
+import 'package:wside/app/models/products.dart';
 import 'package:wside/app/models/quote.dart' as myQuote; // myQuote prefix'i ekleyin
 import 'package:wside/app/models/order.dart' as myOrder; // myOrder prefix'i ekleyin
 import 'package:wside/app/models/account.dart';
+import 'package:wside/app/models/opportunity.dart'; // Opportunity modelini import edin
+
 import 'package:wside/app/models/system_user.dart'; // SystemUser modelini import edin
 import 'package:wside/app/modules/accouts_modules/accounts_detail_page.dart';
 import 'package:wside/app/services/quote_service.dart';
 import 'package:wside/app/services/order_service.dart'; // OrderService'i import edin
+import 'package:wside/app/services/opportunity_service.dart'; // OpportunityService'i import edin
 
 class QuoteDetailPage extends StatefulWidget {
   final myQuote.Quote quote;
@@ -28,6 +32,7 @@ class _QuoteDetailPageState extends State<QuoteDetailPage> {
   String? _selectedSubmittedBy; // Teklif veren kişi
   final QuoteService _quoteService = QuoteService();
   final OrderService _orderService = OrderService(); // OrderService'i ekleyin
+  final OpportunityService _opportunityService = OpportunityService(); // OpportunityService'i ekleyin
   bool _isLoading = false;
   bool _isEditing = false;
 
@@ -91,25 +96,24 @@ class _QuoteDetailPageState extends State<QuoteDetailPage> {
   }
 
   Future<void> _proceedToOrder(BuildContext context) async {
-  myOrder.Order newOrder = myOrder.Order(
-    name: widget.quote.name,
-    description: 'Generated from Quote: ${widget.quote.name}',
-    status: 'Draft',
-    price: double.parse(_priceController.text),
-    quoteId: widget.quote.id!,
-    accountId: widget.quote.accountId,
-    submittedBy: widget.quote.submittedBy, // submittedBy alanı ekleniyor
-    createdAt: Timestamp.now(),
-  );
+    myOrder.Order newOrder = myOrder.Order(
+      name: widget.quote.name,
+      description: 'Generated from Quote: ${widget.quote.name}',
+      status: 'Draft',
+      price: double.parse(_priceController.text),
+      quoteId: widget.quote.id!,
+      accountId: widget.quote.accountId,
+      submittedBy: widget.quote.submittedBy, // submittedBy alanı ekleniyor
+      createdAt: Timestamp.now(),
+    );
 
-  try {
-    await _orderService.addOrder(newOrder);
-    Get.snackbar('Success', 'Order created successfully', snackPosition: SnackPosition.BOTTOM);
-  } catch (e) {
-    Get.snackbar('Error', 'Failed to create order: $e', snackPosition: SnackPosition.BOTTOM);
+    try {
+      await _orderService.addOrder(newOrder);
+      Get.snackbar('Success', 'Order created successfully', snackPosition: SnackPosition.BOTTOM);
+    } catch (e) {
+      Get.snackbar('Error', 'Failed to create order: $e', snackPosition: SnackPosition.BOTTOM);
+    }
   }
-}
-
 
   void _showOrderForm(BuildContext context) {
     showDialog(
@@ -161,6 +165,20 @@ class _QuoteDetailPageState extends State<QuoteDetailPage> {
     DocumentSnapshot userDoc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
     if (userDoc.exists) {
       return SystemUser.fromDoc(userDoc).name;
+    }
+    return null;
+  }
+
+  Future<Product?> _getProductFromOpportunity(String opportunityId) async {
+    DocumentSnapshot opportunityDoc = await FirebaseFirestore.instance.collection('opportunities').doc(opportunityId).get();
+    if (opportunityDoc.exists) {
+      Opportunity opportunity = Opportunity.fromMap(opportunityDoc);
+      if (opportunity.productId != null && opportunity.productId!.isNotEmpty) {
+        DocumentSnapshot productDoc = await FirebaseFirestore.instance.collection('products').doc(opportunity.productId).get();
+        if (productDoc.exists) {
+          return Product.fromFirestore(productDoc);
+        }
+      }
     }
     return null;
   }
@@ -348,6 +366,23 @@ class _QuoteDetailPageState extends State<QuoteDetailPage> {
                             return Text('Submitted By: ${snapshot.data}', style: TextStyle(fontSize: 16));
                           },
                         ),
+                  SizedBox(height: 20.0),
+                  FutureBuilder<Product?>(
+                    future: _getProductFromOpportunity(widget.quote.opportunityId),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return CircularProgressIndicator();
+                      }
+                      if (!snapshot.hasData) {
+                        return Text('No associated product found.', style: TextStyle(fontSize: 16));
+                      }
+                      Product? product = snapshot.data;
+                      return Text(
+                        'Product: ${product?.name ?? 'N/A'}',
+                        style: TextStyle(fontSize: 16, color: Colors.blue, decoration: TextDecoration.underline),
+                      );
+                    },
+                  ),
                   SizedBox(height: 20.0),
                   _isLoading ? CircularProgressIndicator() : Container(),
                   SizedBox(height: 20.0),

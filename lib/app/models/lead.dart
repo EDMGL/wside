@@ -10,6 +10,7 @@ class Lead {
   String ownerId; // Owner ID
   String description; // Description
   Timestamp? createdAt;
+  String productId; // Product ID
 
   Lead({
     this.id,
@@ -21,6 +22,7 @@ class Lead {
     required this.ownerId,
     required this.description,
     this.createdAt,
+    required this.productId,
   });
 
   Map<String, dynamic> toMap() {
@@ -34,6 +36,7 @@ class Lead {
       'ownerId': ownerId, // Owner ID
       'description': description, // Description
       'createdAt': createdAt,
+      'productId': productId, // Product ID
     };
   }
 
@@ -48,6 +51,7 @@ class Lead {
       ownerId: doc['ownerId'], // Owner ID
       description: doc['description'], // Description
       createdAt: doc['createdAt'],
+      productId: doc['productId'], // Product ID
     );
   }
 }

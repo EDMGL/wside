@@ -1,5 +1,3 @@
-// ignore_for_file: no_leading_underscores_for_local_identifiers, prefer_const_constructors, use_build_context_synchronously
-
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:get/get.dart';
@@ -8,8 +6,16 @@ import 'package:wside/app/services/contact_service.dart'; // ContactService'i im
 import 'package:wside/app/modules/contacts_module/add_contact_page.dart'; // AddContactPage'i import edin
 import 'package:wside/app/modules/contacts_module/contact_detail_page.dart'; // ContactDetailPage'i import edin
 
-class ContactsPage extends StatelessWidget {
+class ContactsPage extends StatefulWidget {
   const ContactsPage({super.key});
+
+  @override
+  _ContactsPageState createState() => _ContactsPageState();
+}
+
+class _ContactsPageState extends State<ContactsPage> {
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
   Stream<List<Contact>> _getContactsStream() {
     return FirebaseFirestore.instance
@@ -18,21 +24,42 @@ class ContactsPage extends StatelessWidget {
         .map((snapshot) => snapshot.docs.map((doc) => Contact.fromMap(doc)).toList());
   }
 
+  Stream<List<Contact>> _getSearchResultsStream(String query) {
+    return FirebaseFirestore.instance
+        .collection('contacts')
+        .where('name', isGreaterThanOrEqualTo: query)
+        .where('name', isLessThanOrEqualTo: query + '\uf8ff')
+        .snapshots()
+        .map((snapshot) => snapshot.docs.map((doc) => Contact.fromMap(doc)).toList());
+  }
+
   Future<void> _deleteContact(BuildContext context, String contactId) async {
     final ContactService _contactService = ContactService();
     try {
       await _contactService.deleteContact(contactId);
-     Get.snackbar('Success', 'Contact deleted successfully');
+      Get.snackbar('Success', 'Contact deleted successfully');
     } catch (e) {
-       Get.snackbar('Failed', 'Failed to delete contact');
-     
+      Get.snackbar('Failed', 'Failed to delete contact');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('Contacts')),
+      appBar: AppBar(
+        title: TextField(
+          controller: _searchController,
+          decoration: InputDecoration(
+            hintText: 'Search by name...',
+            border: InputBorder.none,
+          ),
+          onChanged: (value) {
+            setState(() {
+              _searchQuery = value;
+            });
+          },
+        ),
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           showDialog(
@@ -50,7 +77,7 @@ class ContactsPage extends StatelessWidget {
         child: Icon(Icons.add),
       ),
       body: StreamBuilder<List<Contact>>(
-        stream: _getContactsStream(),
+        stream: _searchQuery.isEmpty ? _getContactsStream() : _getSearchResultsStream(_searchQuery),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return Center(child: CircularProgressIndicator());
@@ -73,7 +100,7 @@ class ContactsPage extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        icon: Icon(Icons.delete,color: Colors.red,),
+                        icon: Icon(Icons.delete, color: Colors.red),
                         onPressed: () => _deleteContact(context, contact.id!),
                       ),
                     ],
