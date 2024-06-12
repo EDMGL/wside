@@ -65,7 +65,7 @@ class LoginPage extends StatelessWidget {
                       onPressed: () {
                         controller.signIn();
                       },
-                      child: const Text('Giriş Yap'),
+                      child: const Text('Login'),
                     ),
                   ],
                 ),
